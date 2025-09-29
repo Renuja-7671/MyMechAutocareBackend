@@ -38,7 +38,7 @@ npm run prisma:seed
 # Terminal 2 - Backend
 cd MyMechAutocareBackend
 node server.js
-
+```
 
 ## Test Accounts
 
