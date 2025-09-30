@@ -1,7 +1,7 @@
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const { validationResult } = require('express-validator');
-const prisma = require('../config/database');
+const userModel = require('../models/userModel');
 
 const authController = {
   // Register new user
@@ -16,60 +16,31 @@ const authController = {
       const { email, password, role, firstName, lastName, phone, address, department, position } = req.body;
 
       // Check if user exists
-      const existingUser = await prisma.user.findUnique({
-        where: { email }
-      });
-
-      if (existingUser) {
+      const emailExists = await userModel.emailExists(email);
+      if (emailExists) {
         return res.status(400).json({ error: 'User already exists with this email' });
       }
 
       // Hash password
       const passwordHash = await bcrypt.hash(password, 12);
 
-      // Create user with role-specific profile in a transaction
-      const result = await prisma.$transaction(async (tx) => {
-        // Create user
-        const user = await tx.user.create({
-          data: {
-            email,
-            passwordHash,
-            role,
-          },
-        });
-
-        // Create role-specific profile
-        if (role === 'customer') {
-          await tx.customer.create({
-            data: {
-              userId: user.id,
-              firstName,
-              lastName,
-              phone,
-              address,
-            },
-          });
-        } else if (role === 'employee') {
-          await tx.employee.create({
-            data: {
-              userId: user.id,
-              firstName,
-              lastName,
-              phone,
-              department,
-              position,
-              hireDate: new Date(),
-            },
-          });
-        }
-
-        return user;
+      // Create user with role-specific profile
+      const user = await userModel.createUser({
+        email,
+        passwordHash,
+        role,
+        firstName,
+        lastName,
+        phone,
+        address,
+        department,
+        position,
       });
 
       res.status(201).json({
         message: 'User registered successfully',
-        userId: result.id,
-        role: result.role,
+        userId: user.id,
+        role: user.role,
       });
 
     } catch (error) {
@@ -91,13 +62,7 @@ const authController = {
       console.log("Login attempt for email:", email);
 
       // Find user with profile data
-      const user = await prisma.user.findUnique({
-        where: { email },
-        include: {
-          customer: true,
-          employee: true,
-        },
-      });
+      const user = await userModel.findByEmail(email);
 
       if (!user) {
         return res.status(401).json({ error: 'Invalid credentials' });
@@ -130,7 +95,6 @@ const authController = {
         id: user.id,
         email: user.email,
         role: user.role,
-        is_active: user.is_active,
       };
 
       // Add role-specific data
@@ -165,31 +129,8 @@ const authController = {
   async getProfile(req, res) {
     try {
       console.log("Fetching profile for userId:", req.user.userId);
-      const user = await prisma.user.findUnique({
-        where: { id: req.user.userId },
-        select: {
-          id: true,
-          email: true,
-          role: true,
-          customer: {
-            select: {
-              firstName: true,
-              lastName: true,
-              phone: true,
-              address: true,
-            },
-          },
-          employee: {
-            select: {
-              firstName: true,
-              lastName: true,
-              department: true,
-              position: true,
-              phone: true,
-            },
-          },
-        },
-      });
+      
+      const user = await userModel.findById(req.user.userId);
 
       if (!user) {
         return res.status(404).json({ error: 'User not found' });
