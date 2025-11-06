@@ -78,22 +78,25 @@ model Employee {
 // ============================================
 
 model Vehicle {
-  id          Int      @id @default(autoincrement())
-  customerId  Int      @map("customer_id")
-  make        String
-  model       String
-  year        Int
-  vin         String?  @unique
-  licensePlate String? @map("license_plate")
-  color       String?
-  mileage     Int?
-  createdAt   DateTime @default(now()) @map("created_at")
-  updatedAt   DateTime @updatedAt @map("updated_at")
-  
+  id             Int      @id @default(autoincrement())
+  customerId     Int      @map("customer_id")
+  make           String
+  model          String
+  year           Int
+  vin            String?  @unique
+  licensePlate   String?  @map("license_plate")
+  color          String?
+  mileage        Int?
+  exteriorImage1 String?  @map("exterior_image_1")
+  exteriorImage2 String?  @map("exterior_image_2")
+  interiorImage  String?  @map("interior_image")
+  createdAt      DateTime @default(now()) @map("created_at")
+  updatedAt      DateTime @updatedAt @map("updated_at")
+
   customer     Customer      @relation(fields: [customerId], references: [id], onDelete: Cascade)
   appointments Appointment[]
   projects     Project[]
-  
+
   @@map("vehicles")
 }
 
