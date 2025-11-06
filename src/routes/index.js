@@ -7,6 +7,8 @@ const chatbotRoutes = require('./chatbotRoutes');
 const vehicleRoutes = require('./vehicleRoutes');
 const appointmentRoutes = require('./appointmentRoutes');
 const projectRoutes = require('./projectRoutes');
+const adminRoutes = require('./adminRoutes');
+const employeeRoutes = require('./employeeRoutes');
 
 // Health check endpoint (can be accessed at /api/health)
 router.get('/health', (req, res) => {
@@ -24,6 +26,8 @@ router.use('/chatbot', chatbotRoutes);
 router.use('/vehicles', vehicleRoutes);
 router.use('/appointments', appointmentRoutes);
 router.use('/projects', projectRoutes);
+router.use('/admin', adminRoutes);
+router.use('/employees', employeeRoutes);
 
 // API documentation endpoint
 router.get('/', (req, res) => {
@@ -63,6 +67,26 @@ router.get('/', (req, res) => {
         create: 'POST /api/projects (protected)',
         update: 'PUT /api/projects/:projectId (protected)',
         delete: 'DELETE /api/projects/:projectId (protected)',
+      },
+      admin: {
+        dashboardStats: 'GET /api/admin/dashboard-stats (admin only)',
+        users: 'GET /api/admin/users (admin only)',
+        updateUserRole: 'PATCH /api/admin/users/:userId/role (admin only)',
+        deleteUser: 'DELETE /api/admin/users/:userId (admin only)',
+        services: 'GET /api/admin/services (admin only)',
+        assignService: 'POST /api/admin/services/:serviceId/assign (admin only)',
+        appointments: 'GET /api/admin/appointments (admin only)',
+        reports: 'GET /api/admin/reports (admin only)',
+        createEmployee: 'POST /api/admin/employees (admin only)',
+        modifications: 'GET /api/admin/modifications (admin only)',
+        updateModification: 'PATCH /api/admin/modifications/:projectId (admin only)',
+      },
+      employees: {
+        assignedServices: 'GET /api/employees/assigned-services (employee only)',
+        upcomingAppointments: 'GET /api/employees/upcoming-appointments (employee only)',
+        logTime: 'POST /api/employees/time-logs (employee only)',
+        timeLogs: 'GET /api/employees/time-logs (employee only)',
+        updateServiceStatus: 'PATCH /api/employees/services/:serviceId/status (employee only)',
       },
       health: 'GET /api/health',
     }
