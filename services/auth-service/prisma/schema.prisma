@@ -1,0 +1,278 @@
+generator client {
+  provider = "prisma-client"
+  // Generate the runtime client into the service's node_modules so @prisma/client can initialize correctly
+  output = "../node_modules/.prisma/client"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model appointments {
+  id             Int               @id @default(autoincrement())
+  customer_id    Int
+  vehicle_id     Int
+  service_id     Int?
+  scheduled_date DateTime
+  status         AppointmentStatus @default(scheduled)
+  notes          String?
+  created_at     DateTime          @default(now())
+  updated_at     DateTime
+  customers      customers         @relation(fields: [customer_id], references: [id], onDelete: Cascade)
+  services       services?         @relation(fields: [service_id], references: [id])
+  vehicles       vehicles          @relation(fields: [vehicle_id], references: [id], onDelete: Cascade)
+  feedback       feedback[]
+  service_logs   service_logs[]
+}
+
+model audit_logs {
+  id          Int      @id @default(autoincrement())
+  user_id     Int?
+  action      String
+  entity_type String
+  entity_id   Int?
+  changes     Json?
+  ip_address  String?
+  created_at  DateTime @default(now())
+  users       users?   @relation(fields: [user_id], references: [id])
+}
+
+model customers {
+  id            Int            @id @default(autoincrement())
+  user_id       Int            @unique
+  first_name    String
+  last_name     String
+  phone         String?
+  address       String?
+  city          String?
+  postal_code   String?
+  date_of_birth DateTime?      @db.Date
+  created_at    DateTime       @default(now())
+  updated_at    DateTime
+  appointments  appointments[]
+  users         users          @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  feedback      feedback[]
+  projects      projects[]
+  vehicles      vehicles[]
+}
+
+model employees {
+  id           Int            @id @default(autoincrement())
+  user_id      Int            @unique
+  first_name   String
+  last_name    String
+  phone        String?
+  department   String?
+  position     String?
+  hire_date    DateTime       @db.Date
+  hourly_rate  Decimal?       @db.Decimal(10, 2)
+  is_available Boolean        @default(true)
+  created_at   DateTime       @default(now())
+  updated_at   DateTime
+  users        users          @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  project_logs project_logs[]
+  service_logs service_logs[]
+}
+
+model feedback {
+  id             Int           @id @default(autoincrement())
+  customer_id    Int
+  appointment_id Int?
+  project_id     Int?
+  rating         Int?
+  comment        String?
+  created_at     DateTime      @default(now())
+  appointments   appointments? @relation(fields: [appointment_id], references: [id])
+  customers      customers     @relation(fields: [customer_id], references: [id], onDelete: Cascade)
+  projects       projects?     @relation(fields: [project_id], references: [id])
+}
+
+model messages {
+  id                                Int      @id @default(autoincrement())
+  sender_id                         Int
+  receiver_id                       Int
+  related_entity_type               String?
+  related_entity_id                 Int?
+  message                           String
+  is_read                           Boolean  @default(false)
+  created_at                        DateTime @default(now())
+  users_messages_receiver_idTousers users    @relation("messages_receiver_idTousers", fields: [receiver_id], references: [id], onDelete: Cascade)
+  users_messages_sender_idTousers   users    @relation("messages_sender_idTousers", fields: [sender_id], references: [id], onDelete: Cascade)
+}
+
+model notifications {
+  id                  Int      @id @default(autoincrement())
+  user_id             Int
+  title               String
+  message             String
+  type                String
+  is_read             Boolean  @default(false)
+  related_entity_type String?
+  related_entity_id   Int?
+  created_at          DateTime @default(now())
+  users               users    @relation(fields: [user_id], references: [id], onDelete: Cascade)
+}
+
+model parts {
+  id                Int             @id @default(autoincrement())
+  name              String
+  part_number       String?         @unique
+  description       String?
+  category          String?
+  quantity_in_stock Int             @default(0)
+  unit_price        Decimal?        @db.Decimal(10, 2)
+  reorder_level     Int             @default(10)
+  supplier          String?
+  created_at        DateTime        @default(now())
+  updated_at        DateTime
+  service_parts     service_parts[]
+}
+
+model project_logs {
+  id            Int             @id @default(autoincrement())
+  project_id    Int
+  employee_id   Int
+  log_date      DateTime        @db.Date
+  hours_logged  Decimal         @db.Decimal(5, 2)
+  description   String
+  created_at    DateTime        @default(now())
+  updated_at    DateTime
+  employees     employees       @relation(fields: [employee_id], references: [id], onDelete: Cascade)
+  projects      projects        @relation(fields: [project_id], references: [id], onDelete: Cascade)
+  service_parts service_parts[]
+}
+
+model projects {
+  id             Int            @id @default(autoincrement())
+  customer_id    Int
+  vehicle_id     Int
+  title          String
+  description    String
+  project_type   String?
+  status         ProjectStatus  @default(pending)
+  priority       Priority       @default(medium)
+  estimated_cost Decimal?       @db.Decimal(10, 2)
+  actual_cost    Decimal?       @db.Decimal(10, 2)
+  start_date     DateTime?      @db.Date
+  end_date       DateTime?      @db.Date
+  approved_by    Int?
+  approved_at    DateTime?
+  created_at     DateTime       @default(now())
+  updated_at     DateTime
+  feedback       feedback[]
+  project_logs   project_logs[]
+  customers      customers      @relation(fields: [customer_id], references: [id], onDelete: Cascade)
+  vehicles       vehicles       @relation(fields: [vehicle_id], references: [id], onDelete: Cascade)
+}
+
+model service_logs {
+  id                  Int             @id @default(autoincrement())
+  appointment_id      Int
+  employee_id         Int
+  start_time          DateTime
+  end_time            DateTime?
+  hours_worked        Decimal?        @db.Decimal(5, 2)
+  progress_percentage Int             @default(0)
+  status              ServiceStatus   @default(in_progress)
+  notes               String?
+  created_at          DateTime        @default(now())
+  updated_at          DateTime
+  appointments        appointments    @relation(fields: [appointment_id], references: [id], onDelete: Cascade)
+  employees           employees       @relation(fields: [employee_id], references: [id], onDelete: Cascade)
+  service_parts       service_parts[]
+}
+
+model service_parts {
+  id             Int           @id @default(autoincrement())
+  service_log_id Int?
+  project_log_id Int?
+  part_id        Int
+  quantity_used  Int
+  created_at     DateTime      @default(now())
+  parts          parts         @relation(fields: [part_id], references: [id])
+  project_logs   project_logs? @relation(fields: [project_log_id], references: [id], onDelete: Cascade)
+  service_logs   service_logs? @relation(fields: [service_log_id], references: [id], onDelete: Cascade)
+}
+
+model services {
+  id                 Int            @id @default(autoincrement())
+  name               String
+  description        String?
+  category           String?
+  estimated_duration Int?
+  base_price         Decimal?       @db.Decimal(10, 2)
+  is_active          Boolean        @default(true)
+  created_at         DateTime       @default(now())
+  updated_at         DateTime
+  appointments       appointments[]
+}
+
+model users {
+  id                                   Int             @id @default(autoincrement())
+  email                                String          @unique
+  password_hash                        String
+  role                                 Role
+  is_active                            Boolean         @default(true)
+  created_at                           DateTime        @default(now())
+  updated_at                           DateTime
+  audit_logs                           audit_logs[]
+  customers                            customers?
+  employees                            employees?
+  messages_messages_receiver_idTousers messages[]      @relation("messages_receiver_idTousers")
+  messages_messages_sender_idTousers   messages[]      @relation("messages_sender_idTousers")
+  notifications                        notifications[]
+}
+
+model vehicles {
+  id            Int            @id @default(autoincrement())
+  customer_id   Int
+  make          String
+  model         String
+  year          Int
+  vin           String?        @unique
+  license_plate String?
+  color         String?
+  mileage       Int?
+  created_at    DateTime       @default(now())
+  updated_at    DateTime
+  appointments  appointments[]
+  projects      projects[]
+  customers     customers      @relation(fields: [customer_id], references: [id], onDelete: Cascade)
+}
+
+enum AppointmentStatus {
+  scheduled
+  confirmed
+  in_progress
+  completed
+  cancelled
+}
+
+enum Priority {
+  low
+  medium
+  high
+  urgent
+}
+
+enum ProjectStatus {
+  pending
+  approved
+  in_progress
+  completed
+  cancelled
+}
+
+enum Role {
+  customer
+  employee
+  admin
+}
+
+enum ServiceStatus {
+  not_started
+  in_progress
+  completed
+  on_hold
+}
