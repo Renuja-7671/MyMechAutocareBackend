@@ -378,10 +378,134 @@ async function cancelAppointment(req, res) {
   }
 }
 
+/**
+ * Get available time slots for a specific date
+ * Business hours:
+ * - Weekdays (Mon-Fri): 9:00 AM - 6:00 PM
+ * - Saturday: 8:00 AM - 7:00 PM
+ * - Sunday: CLOSED
+ */
+async function getAvailableTimeSlots(req, res) {
+  try {
+    const { date } = req.query;
+
+    if (!date) {
+      return res.status(400).json({
+        success: false,
+        error: 'Date is required',
+      });
+    }
+
+    const selectedDate = new Date(date);
+    const dayOfWeek = selectedDate.getDay(); // 0 = Sunday, 6 = Saturday
+
+    // Check if Sunday (closed)
+    if (dayOfWeek === 0) {
+      return res.status(200).json({
+        success: true,
+        data: {
+          availableSlots: [],
+          message: 'Service station is closed on Sundays',
+        },
+      });
+    }
+
+    // Define business hours based on day
+    let startHour, endHour;
+    if (dayOfWeek === 6) {
+      // Saturday
+      startHour = 8;
+      endHour = 19; // 7 PM (19:00)
+    } else {
+      // Weekdays (Monday-Friday)
+      startHour = 9;
+      endHour = 18; // 6 PM (18:00)
+    }
+
+    // Generate all possible time slots
+    const allSlots = [];
+    for (let hour = startHour; hour < endHour; hour++) {
+      allSlots.push({
+        hour,
+        time: `${hour.toString().padStart(2, '0')}:00`,
+        display: formatHourDisplay(hour),
+      });
+    }
+
+    // Get existing appointments for the selected date
+    const startOfDay = new Date(selectedDate);
+    startOfDay.setHours(0, 0, 0, 0);
+
+    const endOfDay = new Date(selectedDate);
+    endOfDay.setHours(23, 59, 59, 999);
+
+    const existingAppointments = await prisma.appointment.findMany({
+      where: {
+        scheduledDate: {
+          gte: startOfDay,
+          lte: endOfDay,
+        },
+        status: {
+          in: ['scheduled', 'confirmed', 'in_progress'],
+        },
+      },
+      select: {
+        scheduledDate: true,
+      },
+    });
+
+    // Extract booked hours
+    const bookedHours = existingAppointments.map((apt) => {
+      return new Date(apt.scheduledDate).getHours();
+    });
+
+    // Filter out booked slots
+    const availableSlots = allSlots.filter((slot) => {
+      return !bookedHours.includes(slot.hour);
+    });
+
+    return res.status(200).json({
+      success: true,
+      data: {
+        date,
+        dayOfWeek: getDayName(dayOfWeek),
+        businessHours: `${formatHourDisplay(startHour)} - ${formatHourDisplay(endHour)}`,
+        availableSlots,
+        totalSlots: allSlots.length,
+        bookedSlots: bookedHours.length,
+      },
+    });
+  } catch (error) {
+    console.error('Error fetching available time slots:', error);
+    return res.status(500).json({
+      success: false,
+      error: 'Failed to fetch available time slots',
+    });
+  }
+}
+
+/**
+ * Helper function to format hour for display
+ */
+function formatHourDisplay(hour) {
+  const period = hour >= 12 ? 'PM' : 'AM';
+  const displayHour = hour > 12 ? hour - 12 : hour === 0 ? 12 : hour;
+  return `${displayHour}:00 ${period}`;
+}
+
+/**
+ * Helper function to get day name
+ */
+function getDayName(dayOfWeek) {
+  const days = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+  return days[dayOfWeek];
+}
+
 module.exports = {
   getCustomerAppointments,
   getServiceProgress,
   createAppointment,
   updateAppointment,
   cancelAppointment,
+  getAvailableTimeSlots,
 };

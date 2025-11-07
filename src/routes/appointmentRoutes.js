@@ -13,6 +13,9 @@ router.get('/', authenticateToken, appointmentController.getCustomerAppointments
 // GET /api/appointments/service-progress - Get service progress
 router.get('/service-progress', authenticateToken, appointmentController.getServiceProgress);
 
+// GET /api/appointments/available-slots - Get available time slots for a date
+router.get('/available-slots', authenticateToken, appointmentController.getAvailableTimeSlots);
+
 // POST /api/appointments - Create a new appointment
 router.post('/', authenticateToken, appointmentController.createAppointment);
 

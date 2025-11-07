@@ -28,11 +28,11 @@ app.get('/', (req, res) => {
 });
 
 // Main health check (server level)
-app.get('/health', (req, res) => {
+app.get('/api/health', (req, res) => {
   res.json({
     success: true,
     status: 'OK',
-    message: 'Server is running',
+    message: 'Backend is running',
     uptime: process.uptime(),
     timestamp: new Date().toISOString()
   });
@@ -64,8 +64,8 @@ app.use((err, req, res, next) => {
 const PORT = process.env.PORT || 8000;
 
 app.listen(PORT, '0.0.0.0', () => {
-  console.log(`🚀 Server is running on port ${PORT}`);
-  console.log(`📝 Environment: ${process.env.NODE_ENV || 'development'}`);
-  console.log(`🔗 API Documentation: http://localhost:${PORT}/api`);
-  console.log(`💚 Health Check: http://localhost:${PORT}/health`);
+  console.log(`Server is running on port ${PORT}`);
+  console.log(`Environment: ${process.env.NODE_ENV || 'development'}`);
+  console.log(`API Documentation: http://localhost:${PORT}/api`);
+  console.log(`Health Check: http://localhost:${PORT}/api/health`);
 });
