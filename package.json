@@ -12,7 +12,7 @@
     "@langchain/google-genai": "^1.0.0",
     "@prisma/client": "^6.16.2",
     "@supabase/supabase-js": "^2.80.0",
-    "bcryptjs": "^3.0.2",
+    "bcryptjs": "^3.0.3",
     "cors": "^2.8.5",
     "dotenv": "^17.2.2",
     "express": "^5.1.0",
@@ -24,6 +24,7 @@
   },
   "devDependencies": {
     "cross-env": "^10.1.0",
+    "dotenv-cli": "^11.0.0",
     "jest": "^30.2.0",
     "nodemon": "^3.1.10",
     "supertest": "^7.1.4"
@@ -37,7 +38,8 @@
     "prisma:seed": "node prisma/seed.js",
     "test": "cross-env NODE_ENV=test jest --runInBand",
     "test:unit": "cross-env NODE_ENV=test jest --runInBand tests/unit",
-    "test:integration": "cross-env NODE_ENV=test jest --runInBand tests/integration"
+    "test:integration": "cross-env NODE_ENV=test jest --runInBand tests/integration",
+    "test:coverage": "cross-env NODE_ENV=test jest --coverage --runInBand"
   },
   "prisma": {
     "seed": "node prisma/seed.js"
