@@ -23,7 +23,10 @@
     "prisma": "^6.16.2"
   },
   "devDependencies": {
-    "nodemon": "^3.1.10"
+    "cross-env": "^10.1.0",
+    "jest": "^30.2.0",
+    "nodemon": "^3.1.10",
+    "supertest": "^7.1.4"
   },
   "scripts": {
     "start": "node src/server.js",
@@ -31,7 +34,10 @@
     "prisma:generate": "prisma generate",
     "prisma:migrate": "prisma migrate dev",
     "prisma:studio": "prisma studio",
-    "prisma:seed": "node prisma/seed.js"
+    "prisma:seed": "node prisma/seed.js",
+    "test": "cross-env NODE_ENV=test jest --runInBand",
+    "test:unit": "cross-env NODE_ENV=test jest --runInBand tests/unit",
+    "test:integration": "cross-env NODE_ENV=test jest --runInBand tests/integration"
   },
   "prisma": {
     "seed": "node prisma/seed.js"
