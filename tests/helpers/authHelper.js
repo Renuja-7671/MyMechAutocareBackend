@@ -7,11 +7,11 @@ const prisma = new PrismaClient();
 
 /**
  * Creates a user with the correct role-specific profile (customer or employee).
- * This is useful for setting up test conditions.
  * @param {object} userData - The user data to create.
+ * @param {boolean} createProfile - Whether to create the role-specific profile (default: true)
  * @returns {Promise<object>} The created user object with profiles included.
  */
-async function createTestUser(userData) {
+async function createTestUser(userData, createProfile = true) {
   const { email, password, role = 'customer', firstName = 'Test', lastName = 'User' } = userData;
 
   const passwordHash = await bcrypt.hash(password, 12);
@@ -22,32 +22,32 @@ async function createTestUser(userData) {
     role,
   };
 
-  // This is the updated logic: create the correct profile based on the role.
-  if (role === 'employee' || role === 'admin') {
-    // For both 'employee' and 'admin' roles, we create an 'employee' profile record.
-    // 'admin' is a role type, but the physical data is stored in the employees table.
-    data.employee = {
-      create: {
-        firstName,
-        lastName,
-        hireDate: new Date(), // 'hireDate' is a required field in your 'employees' table.
-      },
-    };
-  } else { // Default to creating a customer profile
-    data.customer = {
-      create: {
-        firstName,
-        lastName,
-      },
-    };
+  // Only create profile if requested
+  if (createProfile) {
+    if (role === 'employee' || role === 'admin') {
+      data.employee = {
+        create: {
+          firstName,
+          lastName,
+          hireDate: new Date(),
+        },
+      };
+    } else { // Default to creating a customer profile
+      data.customer = {
+        create: {
+          firstName,
+          lastName,
+        },
+      };
+    }
   }
 
   // Create the user and their associated profile in a single transaction
   const user = await prisma.user.create({
     data,
     include: {
-      customer: true, // Include the customer profile if it exists
-      employee: true, // Include the employee profile if it exists
+      customer: true,
+      employee: true,
     },
   });
 
