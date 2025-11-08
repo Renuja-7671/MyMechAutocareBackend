@@ -46,7 +46,7 @@ Return ONLY the JSON object, no other text.
 
   const chain = extractionPrompt.pipe(model);
 
-  const currentDate = new Date().toISOString().split('T')[0];
+  const currentDate = new Date().toISOString().split("T")[0];
   const response = await chain.invoke({
     message: userMessage,
     currentDate: currentDate,
@@ -87,8 +87,8 @@ async function getAvailableTimeSlots(date) {
           lte: endOfDay,
         },
         status: {
-          not: 'cancelled'
-        }
+          not: "cancelled",
+        },
       },
       select: {
         scheduledDate: true,
@@ -97,18 +97,30 @@ async function getAvailableTimeSlots(date) {
 
     // Define business hours (9 AM to 5 PM with 1-hour slots)
     const businessHours = [
-      '09:00', '10:00', '11:00', '12:00',
-      '13:00', '14:00', '15:00', '16:00', '17:00'
+      "09:00",
+      "10:00",
+      "11:00",
+      "12:00",
+      "13:00",
+      "14:00",
+      "15:00",
+      "16:00",
+      "17:00",
     ];
 
     // Get booked time slots
-    const bookedSlots = existingAppointments.map(apt => {
+    const bookedSlots = existingAppointments.map((apt) => {
       const time = new Date(apt.scheduledDate);
-      return `${time.getHours().toString().padStart(2, '0')}:${time.getMinutes().toString().padStart(2, '0')}`;
+      return `${time.getHours().toString().padStart(2, "0")}:${time
+        .getMinutes()
+        .toString()
+        .padStart(2, "0")}`;
     });
 
     // Filter out booked slots
-    const availableSlots = businessHours.filter(slot => !bookedSlots.includes(slot));
+    const availableSlots = businessHours.filter(
+      (slot) => !bookedSlots.includes(slot)
+    );
 
     return availableSlots;
   } catch (error) {
@@ -143,9 +155,10 @@ Keep it concise and conversational.
 
   const chain = responsePrompt.pipe(model);
 
-  const slotsText = timeSlots.length > 0
-    ? timeSlots.join(', ')
-    : 'Unfortunately, there are no available slots';
+  const slotsText =
+    timeSlots.length > 0
+      ? timeSlots.join(", ")
+      : "Unfortunately, there are no available slots";
 
   const response = await chain.invoke({
     date: date,
@@ -194,12 +207,18 @@ For other queries, be helpful and guide them toward booking an appointment.
 async function processChatMessage(userMessage) {
   try {
     // Step 1: Extract intent and date from user message
-    const { intent, date, userFriendlyDate } = await extractDateAndIntent(userMessage);
+    const { intent, date, userFriendlyDate } = await extractDateAndIntent(
+      userMessage
+    );
 
     // Step 2: Handle appointment queries
-    if (intent === 'appointment_query' && date) {
+    if (intent === "appointment_query" && date) {
       const availableSlots = await getAvailableTimeSlots(date);
-      const reply = await generateTimeSlotResponse(availableSlots, date, userFriendlyDate);
+      const reply = await generateTimeSlotResponse(
+        availableSlots,
+        date,
+        userFriendlyDate
+      );
 
       return {
         reply,

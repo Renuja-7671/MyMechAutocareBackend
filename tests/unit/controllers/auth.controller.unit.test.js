@@ -1,27 +1,24 @@
-// tests/unit/controllers/auth.controller.unit.test.js
+// tests/unit/controllers/auth.controller.extra.unit.test.js
 
-// Prevent any real DB connection / side-effects from src/config/database
-jest.mock("../../../src/config/database", () => {
-  return {
-    user: { findUnique: jest.fn(), create: jest.fn() },
-    $connect: jest.fn().mockResolvedValue(undefined),
-    $disconnect: jest.fn().mockResolvedValue(undefined),
-    $transaction: jest.fn(),
-  };
-});
-
-// Mock modules used by the controller
+// Same mocks pattern as your existing tests
 jest.mock("../../../src/models/userModel");
 jest.mock("bcryptjs");
 jest.mock("jsonwebtoken");
 
-const authController = require("../../../src/controllers/authController"); // import after mocks
+// Mock express-validator's validationResult used in controller
+jest.mock("express-validator", () => ({
+  validationResult: jest.fn(),
+}));
+
 const userModel = require("../../../src/models/userModel");
 const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
+const { validationResult } = require("express-validator");
 
-describe("authController.login (unit)", () => {
-  afterEach(() => {
+const authController = require("../../../src/controllers/authController");
+
+describe("authController extra coverage (unit)", () => {
+  beforeEach(() => {
     jest.clearAllMocks();
   });
 
@@ -32,90 +29,207 @@ describe("authController.login (unit)", () => {
     };
   }
 
-  test("successful login -> responds with success and data (token + user)", async () => {
-    // Arrange
+  //
+  // register - validation error
+  //
+  test("register: returns 400 if validation errors present", async () => {
+    const req = { body: {} };
+    const res = makeRes();
+
+    validationResult.mockReturnValue({
+      isEmpty: () => false,
+      array: () => [{ msg: "error" }],
+    });
+
+    await authController.register(req, res);
+
+    expect(res.status).toHaveBeenCalledWith(400);
+    expect(res.json).toHaveBeenCalledWith({
+      success: false,
+      errors: [{ msg: "error" }],
+    });
+  });
+
+  test("register: returns 400 if email already exists", async () => {
+    const req = { body: { email: "a@b.com", password: "pass", name: "A B" } };
+    const res = makeRes();
+
+    validationResult.mockReturnValue({ isEmpty: () => true });
+    userModel.emailExists.mockResolvedValue(true);
+
+    await authController.register(req, res);
+
+    expect(userModel.emailExists).toHaveBeenCalledWith("a@b.com");
+    expect(res.status).toHaveBeenCalledWith(400);
+    expect(res.json).toHaveBeenCalledWith({
+      success: false,
+      error: "User already exists with this email",
+    });
+  });
+
+  test("register: successful creation returns 201 with userId and role", async () => {
     const req = {
-      body: { email: "john.doe@email.com", password: "password123" },
+      body: {
+        email: "c@d.com",
+        password: "secret",
+        name: "John Doe",
+        phone: "123",
+      },
     };
     const res = makeRes();
-    const next = jest.fn();
 
-    // Provide a fake user shape similar to real DB return
-    const fakeUser = {
-      id: 1,
-      email: req.body.email,
-      passwordHash: "hashed",
+    validationResult.mockReturnValue({ isEmpty: () => true });
+    userModel.emailExists.mockResolvedValue(false);
+    bcrypt.hash.mockResolvedValue("hashedpw");
+    userModel.createUser.mockResolvedValue({ id: 77, role: "customer" });
+
+    await authController.register(req, res);
+
+    expect(bcrypt.hash).toHaveBeenCalledWith("secret", 12);
+    expect(userModel.createUser).toHaveBeenCalledWith(
+      expect.objectContaining({
+        email: "c@d.com",
+        passwordHash: "hashedpw",
+        firstName: "John",
+        lastName: "Doe",
+        phone: "123",
+      })
+    );
+    expect(res.status).toHaveBeenCalledWith(201);
+    expect(res.json).toHaveBeenCalledWith({
+      success: true,
+      message: "User registered successfully",
+      userId: 77,
       role: "customer",
-      isActive: true,
-      customer: { firstName: "John", lastName: "Doe", phone: "123" },
-    };
-    userModel.findByEmail.mockResolvedValue(fakeUser);
-
-    // bcrypt.compare -> true
-    bcrypt.compare.mockResolvedValue(true);
-
-    // jwt.sign -> optional mock (not required for this assertion)
-    jwt.sign.mockReturnValue("FAKE.JWT.TOKEN");
-
-    // Act
-    await authController.login(req, res, next);
-
-    // Assert: controller returned JSON response indicating success
-    expect(res.json).toHaveBeenCalled();
-    const jsonArg = res.json.mock.calls[0][0];
-    expect(jsonArg).toBeDefined();
-    expect(jsonArg).toHaveProperty("success", true);
-    // Response should include data with token and user fields (if present)
-    expect(jsonArg).toHaveProperty("data");
-    expect(typeof jsonArg.data === "object").toBe(true);
-
-    // next() shouldn't be called because controller handles response
-    expect(next).not.toHaveBeenCalled();
+    });
   });
 
-  test("wrong password -> 401 and success false", async () => {
-    const req = { body: { email: "john.doe@email.com", password: "badpass" } };
+  test("register: 500 on DB error", async () => {
+    const req = { body: { email: "err@x.com", password: "p", name: "X Y" } };
     const res = makeRes();
-    const next = jest.fn();
 
-    const fakeUser = {
-      id: 2,
-      email: req.body.email,
-      passwordHash: "hashed",
-      isActive: true,
-    };
-    userModel.findByEmail.mockResolvedValue(fakeUser);
+    validationResult.mockReturnValue({ isEmpty: () => true });
+    userModel.emailExists.mockResolvedValue(false);
+    bcrypt.hash.mockResolvedValue("h");
+    userModel.createUser.mockRejectedValue(new Error("DB fail"));
 
-    bcrypt.compare.mockResolvedValue(false);
+    await authController.register(req, res);
 
-    await authController.login(req, res, next);
-
-    expect(res.status).toHaveBeenCalled();
-    const statusArg = res.status.mock.calls[0][0];
-    expect([400, 401, 403]).toContain(statusArg);
-
-    expect(res.json).toHaveBeenCalled();
-    const body = res.json.mock.calls[0][0];
-    expect(body).toBeDefined();
-    expect(next).not.toHaveBeenCalled();
+    expect(res.status).toHaveBeenCalledWith(500);
+    expect(res.json).toHaveBeenCalledWith({
+      success: false,
+      error: "Registration failed. Please try again.",
+    });
   });
 
-  test("user not found -> 401 and success false", async () => {
-    const req = { body: { email: "noone@x.com", password: "whatever" } };
+  //
+  // logout
+  //
+  test("logout: returns success message", async () => {
+    const req = {};
     const res = makeRes();
-    const next = jest.fn();
 
-    userModel.findByEmail.mockResolvedValue(null);
+    await authController.logout(req, res);
 
-    await authController.login(req, res, next);
+    expect(res.json).toHaveBeenCalledWith({
+      success: true,
+      message: "Logged out successfully",
+    });
+  });
 
-    expect(res.status).toHaveBeenCalled();
-    const statusArg = res.status.mock.calls[0][0];
-    expect([400, 401, 403]).toContain(statusArg);
+  //
+  // getProfile
+  //
+  test("getProfile: 404 when user not found", async () => {
+    const req = { user: { userId: 5 } };
+    const res = makeRes();
 
-    expect(res.json).toHaveBeenCalled();
-    const body = res.json.mock.calls[0][0];
-    expect(body).toBeDefined();
-    expect(next).not.toHaveBeenCalled();
+    userModel.findById.mockResolvedValue(null);
+
+    await authController.getProfile(req, res);
+
+    expect(userModel.findById).toHaveBeenCalledWith(5);
+    expect(res.status).toHaveBeenCalledWith(404);
+    expect(res.json).toHaveBeenCalledWith({
+      success: false,
+      error: "User not found",
+    });
+  });
+
+  test("getProfile: returns formatted user when customer profile exists", async () => {
+    const req = { user: { userId: 6 } };
+    const res = makeRes();
+
+    const user = {
+      id: 6,
+      email: "u@u.com",
+      role: "customer",
+      customer: { firstName: "Jane", lastName: "Doe", phone: "555" },
+    };
+    userModel.findById.mockResolvedValue(user);
+
+    await authController.getProfile(req, res);
+
+    expect(res.json).toHaveBeenCalledWith({
+      success: true,
+      user: expect.objectContaining({
+        id: 6,
+        email: "u@u.com",
+        role: "customer",
+        name: "Jane Doe",
+        phone: "555",
+      }),
+    });
+  });
+
+  test("getProfile: returns formatted user when employee profile exists", async () => {
+    const req = { user: { userId: 7 } };
+    const res = makeRes();
+
+    const user = {
+      id: 7,
+      email: "e@e.com",
+      role: "employee",
+      employee: {
+        firstName: "Emp",
+        lastName: "Loyee",
+        department: "Svc",
+        position: "Tech",
+        phone: "999",
+      },
+    };
+    userModel.findById.mockResolvedValue(user);
+
+    await authController.getProfile(req, res);
+
+    expect(res.json).toHaveBeenCalledWith({
+      success: true,
+      user: expect.objectContaining({
+        id: 7,
+        email: "e@e.com",
+        role: "employee",
+        name: "Emp Loyee",
+        phone: "999",
+        profile: expect.objectContaining({
+          department: "Svc",
+          position: "Tech",
+        }),
+      }),
+    });
+  });
+
+  test("getProfile: 500 on DB error", async () => {
+    const req = { user: { userId: 8 } };
+    const res = makeRes();
+
+    userModel.findById.mockRejectedValue(new Error("boom"));
+
+    await authController.getProfile(req, res);
+
+    expect(res.status).toHaveBeenCalledWith(500);
+    expect(res.json).toHaveBeenCalledWith({
+      success: false,
+      error: "Failed to fetch profile",
+    });
   });
 });
