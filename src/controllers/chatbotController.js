@@ -22,10 +22,22 @@ async function handleChatMessage(req, res) {
       data: result,
     });
   } catch (error) {
-    console.error('Error in chatbot controller:', error);
+    console.error('Chatbot error:', error.message);
+
+    // Provide specific error messages based on error type
+    let errorMessage = 'Failed to process message. Please try again.';
+
+    if (error.message && error.message.includes('API key expired')) {
+      errorMessage = 'The AI service API key has expired. Please contact the administrator.';
+    } else if (error.message && error.message.includes('quota')) {
+      errorMessage = 'The AI service quota has been exceeded. Please try again later.';
+    } else if (error.message && error.message.includes('overloaded')) {
+      errorMessage = 'The AI service is currently overloaded. Please try again in a moment.';
+    }
+
     return res.status(500).json({
       success: false,
-      error: 'Failed to process message. Please try again.',
+      error: errorMessage,
     });
   }
 }

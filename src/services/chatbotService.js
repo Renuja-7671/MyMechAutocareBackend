@@ -67,19 +67,62 @@ Return ONLY the JSON object, no other text.
 }
 
 /**
+ * Helper function to format hour for display
+ */
+function formatHourDisplay(hour) {
+  const period = hour >= 12 ? 'PM' : 'AM';
+  const displayHour = hour > 12 ? hour - 12 : hour === 0 ? 12 : hour;
+  return `${displayHour}:00 ${period}`;
+}
+
+/**
  * Get available time slots for a specific date
+ * Uses the same business hours logic as the appointment booking system:
+ * - Weekdays (Mon-Fri): 9:00 AM - 6:00 PM
+ * - Saturday: 8:00 AM - 7:00 PM
+ * - Sunday: CLOSED
  * @param {string} date - Date in YYYY-MM-DD format
- * @returns {Promise<string[]>} - Array of available time slots
+ * @returns {Promise<string[]>} - Array of available time slots in 12-hour format
  */
 async function getAvailableTimeSlots(date) {
   try {
-    const startOfDay = new Date(date);
+    const selectedDate = new Date(date);
+    const dayOfWeek = selectedDate.getDay(); // 0 = Sunday, 6 = Saturday
+
+    // Check if Sunday (closed)
+    if (dayOfWeek === 0) {
+      return [];
+    }
+
+    // Define business hours based on day
+    let startHour, endHour;
+    if (dayOfWeek === 6) {
+      // Saturday
+      startHour = 8;
+      endHour = 19; // 7 PM (19:00)
+    } else {
+      // Weekdays (Monday-Friday)
+      startHour = 9;
+      endHour = 18; // 6 PM (18:00)
+    }
+
+    // Generate all possible time slots
+    const allSlots = [];
+    for (let hour = startHour; hour < endHour; hour++) {
+      allSlots.push({
+        hour,
+        time: `${hour.toString().padStart(2, '0')}:00`,
+        display: formatHourDisplay(hour),
+      });
+    }
+
+    // Get existing appointments for the selected date
+    const startOfDay = new Date(selectedDate);
     startOfDay.setHours(0, 0, 0, 0);
 
-    const endOfDay = new Date(date);
+    const endOfDay = new Date(selectedDate);
     endOfDay.setHours(23, 59, 59, 999);
 
-    // Get all appointments for the requested date
     const existingAppointments = await prisma.appointment.findMany({
       where: {
         scheduledDate: {
@@ -87,28 +130,23 @@ async function getAvailableTimeSlots(date) {
           lte: endOfDay,
         },
         status: {
-          not: 'cancelled'
-        }
+          in: ['scheduled', 'confirmed', 'in_progress'],
+        },
       },
       select: {
         scheduledDate: true,
       },
     });
 
-    // Define business hours (9 AM to 5 PM with 1-hour slots)
-    const businessHours = [
-      '09:00', '10:00', '11:00', '12:00',
-      '13:00', '14:00', '15:00', '16:00', '17:00'
-    ];
-
-    // Get booked time slots
-    const bookedSlots = existingAppointments.map(apt => {
-      const time = new Date(apt.scheduledDate);
-      return `${time.getHours().toString().padStart(2, '0')}:${time.getMinutes().toString().padStart(2, '0')}`;
+    // Extract booked hours
+    const bookedHours = existingAppointments.map((apt) => {
+      return new Date(apt.scheduledDate).getHours();
     });
 
-    // Filter out booked slots
-    const availableSlots = businessHours.filter(slot => !bookedSlots.includes(slot));
+    // Filter out booked slots and return display format
+    const availableSlots = allSlots
+      .filter((slot) => !bookedHours.includes(slot.hour))
+      .map((slot) => slot.display);
 
     return availableSlots;
   } catch (error) {
@@ -125,31 +163,88 @@ async function getAvailableTimeSlots(date) {
  * @returns {Promise<string>}
  */
 async function generateTimeSlotResponse(timeSlots, date, userFriendlyDate) {
-  const responsePrompt = PromptTemplate.fromTemplate(`
-You are a friendly assistant at WheelsDoc Autocare automobile service center.
+  const selectedDate = new Date(date);
+  const dayOfWeek = selectedDate.getDay();
+  const dayName = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'][dayOfWeek];
 
-The customer asked about appointments for {userFriendlyDate} ({date}).
+  // Check if Sunday
+  if (dayOfWeek === 0) {
+    const responsePrompt = PromptTemplate.fromTemplate(`
+You are a friendly assistant at an automobile service center.
+
+The customer asked about appointments for {userFriendlyDate} ({dayName}).
+
+Generate a friendly response explaining that:
+1. The service station is closed on Sundays
+2. Ask them to choose a weekday (Monday-Friday, 9 AM - 6 PM) or Saturday (8 AM - 7 PM)
+3. Offer to help them find available slots for another day
+
+IMPORTANT RULES:
+- Respond with PLAIN TEXT ONLY, NO markdown formatting
+- Do NOT use asterisks (*), bullet points, headers, or any markdown syntax
+- Give ONE single conversational response only
+- Keep it warm, helpful, and natural
+
+Example: "I apologize, but our service center is closed on Sundays. We're open Monday through Friday from 9 AM to 6 PM, and Saturdays from 8 AM to 7 PM. Would you like me to check available time slots for another day?"
+`);
+
+    const chain = responsePrompt.pipe(model);
+    const response = await chain.invoke({
+      userFriendlyDate: userFriendlyDate || date,
+      dayName: dayName,
+    });
+
+    return response.content;
+  }
+
+  // Determine business hours
+  let businessHours;
+  if (dayOfWeek === 6) {
+    businessHours = '8:00 AM - 7:00 PM';
+  } else {
+    businessHours = '9:00 AM - 6:00 PM';
+  }
+
+  const responsePrompt = PromptTemplate.fromTemplate(`
+You are a friendly assistant at an automobile service center.
+
+The customer asked about appointments for {userFriendlyDate} ({dayName}).
+Business hours for this day: {businessHours}
 
 Available time slots: {slots}
 
-Generate a friendly, natural response that:
+Generate a SINGLE friendly, natural response that:
 1. Confirms the date they asked about
-2. Lists the available time slots
-3. Asks them to choose a time slot
-4. Is warm and professional
+2. Lists the available time slots (these are hourly slots)
+3. If no slots available, mention all slots are booked and suggest another day
+4. Asks them to choose a time slot if slots are available
+5. Is warm and professional
 
-Keep it concise and conversational.
+IMPORTANT RULES:
+- Respond with PLAIN TEXT ONLY, NO markdown formatting
+- Do NOT use asterisks (*), bullet points, headers, or any markdown syntax
+- Do NOT include "Scenario 1", "Scenario 2", or any alternative versions
+- Give ONE single conversational response only
+- Keep it concise and natural
+
+Example format (when slots are available):
+"Great! I found several available time slots for {userFriendlyDate}. We have openings at [list times]. Which time works best for you?"
+
+Example format (when no slots available):
+"Unfortunately, all our time slots are booked for {userFriendlyDate}. Would you like to check availability for another day?"
 `);
 
   const chain = responsePrompt.pipe(model);
 
   const slotsText = timeSlots.length > 0
     ? timeSlots.join(', ')
-    : 'Unfortunately, there are no available slots';
+    : 'Unfortunately, all slots are fully booked';
 
   const response = await chain.invoke({
     date: date,
     userFriendlyDate: userFriendlyDate || date,
+    dayName: dayName,
+    businessHours: businessHours,
     slots: slotsText,
   });
 
@@ -174,6 +269,12 @@ Generate a friendly, helpful response. Keep it concise.
 If it's a greeting, greet them back and mention you can help with appointments.
 If it's a general question about services, mention common services (oil change, brake repair, tire service, engine diagnostics) and ask if they'd like to schedule an appointment.
 For other queries, be helpful and guide them toward booking an appointment.
+
+IMPORTANT RULES:
+- Respond with PLAIN TEXT ONLY, NO markdown formatting
+- Do NOT use asterisks (*), bullet points, headers, or any markdown syntax
+- Give ONE single conversational response only
+- Keep it natural and friendly
 `);
 
   const chain = generalPrompt.pipe(model);
@@ -193,10 +294,10 @@ For other queries, be helpful and guide them toward booking an appointment.
  */
 async function processChatMessage(userMessage) {
   try {
-    // Step 1: Extract intent and date from user message
+    // Extract intent and date from user message
     const { intent, date, userFriendlyDate } = await extractDateAndIntent(userMessage);
 
-    // Step 2: Handle appointment queries
+    // Handle appointment queries
     if (intent === 'appointment_query' && date) {
       const availableSlots = await getAvailableTimeSlots(date);
       const reply = await generateTimeSlotResponse(availableSlots, date, userFriendlyDate);
@@ -209,7 +310,7 @@ async function processChatMessage(userMessage) {
       };
     }
 
-    // Step 3: Handle other queries
+    // Handle other queries
     const reply = await generateGeneralResponse(userMessage, intent);
 
     return {
@@ -219,7 +320,7 @@ async function processChatMessage(userMessage) {
       date: null,
     };
   } catch (error) {
-    console.error("Error processing chat message:", error);
+    console.error("Chatbot service error:", error.message);
     throw error;
   }
 }
