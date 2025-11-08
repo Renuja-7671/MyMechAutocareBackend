@@ -46,7 +46,7 @@ Return ONLY the JSON object, no other text.
 
   const chain = extractionPrompt.pipe(model);
 
-  const currentDate = new Date().toISOString().split('T')[0];
+  const currentDate = new Date().toISOString().split("T")[0];
   const response = await chain.invoke({
     message: userMessage,
     currentDate: currentDate,
@@ -300,7 +300,11 @@ async function processChatMessage(userMessage) {
     // Handle appointment queries
     if (intent === 'appointment_query' && date) {
       const availableSlots = await getAvailableTimeSlots(date);
-      const reply = await generateTimeSlotResponse(availableSlots, date, userFriendlyDate);
+      const reply = await generateTimeSlotResponse(
+        availableSlots,
+        date,
+        userFriendlyDate
+      );
 
       return {
         reply,

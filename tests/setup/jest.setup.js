@@ -1,3 +1,7 @@
+// tests/setup/jest.setup.js (add near top)
+jest.doMock("@supabase/supabase-js", () =>
+  require("../unit/__mocks__/@supabase/supabase-js")
+);
 // tests/setup/jest.setup.js
 
 // Increase the timeout for all tests, especially for integration tests

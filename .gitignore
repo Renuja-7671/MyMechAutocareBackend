@@ -4,4 +4,7 @@ node_modules/
 dist/
 build/
 .DS_Store
+.env.example
+.env.test
 coverage/
+coverage.zip

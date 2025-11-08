@@ -8,5 +8,7 @@ module.exports = {
   globalSetup: "<rootDir>/tests/setup/globalSetup.js",
 
   verbose: true,
-  collectCoverage: false, 
+  collectCoverage: true, // enable to get coverage summary
+  coveragePathIgnorePatterns: ["/node_modules/", "/tests/"],
+  coverageReporters: ["text", "lcov", "html"], // optional: nice report formats
 };
