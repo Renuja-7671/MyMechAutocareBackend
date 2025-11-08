@@ -29,11 +29,11 @@ app.get('/', (req, res) => {
 });
 
 // Main health check (server level)
-app.get('/health', (req, res) => {
+app.get('/api/health', (req, res) => {
   res.json({
     success: true,
     status: 'OK',
-    message: 'Server is running',
+    message: 'Backend is running',
     uptime: process.uptime(),
     timestamp: new Date().toISOString()
   });

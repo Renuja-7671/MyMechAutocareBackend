@@ -128,7 +128,7 @@ async function getUpcomingAppointments(req, res) {
       where: {
         id: { in: appointmentIds },
         status: { in: ['scheduled', 'confirmed'] },
-        date: { gte: new Date() }, // Only upcoming
+        scheduledDate: { gte: new Date() }, // Only upcoming
       },
       include: {
         customer: {
@@ -145,8 +145,13 @@ async function getUpcomingAppointments(req, res) {
             year: true,
           },
         },
+        service: {
+          select: {
+            name: true,
+          },
+        },
       },
-      orderBy: { date: 'asc' },
+      orderBy: { scheduledDate: 'asc' },
     });
 
     // Format response
@@ -155,9 +160,9 @@ async function getUpcomingAppointments(req, res) {
       vehicleName: `${appointment.vehicle.year} ${appointment.vehicle.make} ${appointment.vehicle.model}`,
       customerName: `${appointment.customer.firstName} ${appointment.customer.lastName}`,
       customerPhone: appointment.customer.phone || 'N/A',
-      serviceType: appointment.serviceType,
-      date: appointment.date,
-      time: appointment.timeSlot,
+      serviceType: appointment.service?.name || 'Service',
+      date: appointment.scheduledDate,
+      time: new Date(appointment.scheduledDate).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }),
       status: appointment.status,
     }));
 
@@ -299,7 +304,11 @@ async function getTimeLogs(req, res) {
       include: {
         appointment: {
           select: {
-            serviceType: true,
+            service: {
+              select: {
+                name: true,
+              },
+            },
             vehicle: {
               select: {
                 make: true,
@@ -316,7 +325,8 @@ async function getTimeLogs(req, res) {
     // Parse time logs from notes and service data
     const formattedLogs = serviceLogs.flatMap((log) => {
       const vehicle = log.appointment.vehicle;
-      const serviceName = `${vehicle.year} ${vehicle.make} ${vehicle.model} - ${log.appointment.serviceType}`;
+      const serviceTypeName = log.appointment.service?.name || 'Service';
+      const serviceName = `${vehicle.year} ${vehicle.make} ${vehicle.model} - ${serviceTypeName}`;
 
       // If there are notes with time log entries, parse them
       if (log.notes && log.notes.includes('Logged')) {
