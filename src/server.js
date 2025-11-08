@@ -1,3 +1,4 @@
+// src/server.js
 require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
@@ -63,9 +64,15 @@ app.use((err, req, res, next) => {
 // Start server
 const PORT = process.env.PORT || 8000;
 
-app.listen(PORT, '0.0.0.0', () => {
-  console.log(`🚀 Server is running on port ${PORT}`);
-  console.log(`📝 Environment: ${process.env.NODE_ENV || 'development'}`);
-  console.log(`🔗 API Documentation: http://localhost:${PORT}/api`);
-  console.log(`💚 Health Check: http://localhost:${PORT}/health`);
-});
+// Only start listening for connections when NOT in 'test' mode
+if (process.env.NODE_ENV !== 'test') {
+  app.listen(PORT, '0.0.0.0', () => {
+    console.log(`🚀 Server is running on port ${PORT}`);
+    console.log(`📝 Environment: ${process.env.NODE_ENV || 'development'}`);
+    console.log(`🔗 API Documentation: http://localhost:${PORT}/api`);
+    console.log(`💚 Health Check: http://localhost:${PORT}/health`);
+  });
+}
+
+// Export the app object for our integration tests
+module.exports = app;

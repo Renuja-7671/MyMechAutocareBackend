@@ -3,6 +3,10 @@ module.exports = {
   testEnvironment: "node",
   testMatch: ["**/tests/**/*.test.js"],
   setupFilesAfterEnv: ["<rootDir>/tests/setup/jest.setup.js"],
+
+  // Add this line below
+  globalSetup: "<rootDir>/tests/setup/globalSetup.js",
+
   verbose: true,
   collectCoverage: true, // enable to get coverage summary
   coveragePathIgnorePatterns: ["/node_modules/", "/tests/"],
